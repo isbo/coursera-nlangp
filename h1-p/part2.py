@@ -45,40 +45,78 @@ def get_mle(counts_file):
 
     return (q, e)
 
-def is_word_in_vocab(obs_counts, word):
-    for tag in obs_counts:
-        if word in obs_counts[tag]["word_counts"]:
-            return True
-    return False
-
-def usage():
-    print """
-    python part1.py counts_file test_file > output_file
-        Read in a gene tagged training input file and produce counts.
-    """
-
 class TrigramHMM(object):
     def __init__(self, q, e):
         self.q = q
         self.e = e
-        self.all_states = set()
+        self.s = e.keys()
+
+    def states(self, i):
+        if i <= 0:
+            return ("*")
+        else:
+            return self.s
+
+    def is_word_in_vocab(self, word):
+        for tag in self.e:
+            if word in self.e[tag]:
+                return True
+        return False
 
     def find_tags(self, words):
-        tags = []
-        for word in words:
-            pass
-        return tags
+        y = [None] * len(words)
+        p = {}
+        bp = {}
+        p[(0, "*", "*")] = 1
+        n = len(words)
+        for i in xrange(1, n + 1):
+            for u in self.states(i - 1):
+                for v in self.states(i):
+                    max_p = -1
+                    max_w = None
+                    for w in self.states(i - 2):
+                        word = words[i - 1]
+                        if word not in e[v]:
+                            if self.is_word_in_vocab(word):
+                                e_p = 0
+                            else:
+                                e_p = e[v]["_RARE_"]
+                        else:
+                            e_p = e[v][word]
+                        p_w = p[(i - 1, w, u)] * q[(w, u, v)] * e_p
+                        if p_w > max_p:
+                            max_p = p_w
+                            max_w = w
+
+                    p[(i, u, v)] = max_p
+                    bp[(i, u, v)] = max_w
+
+        max = -1
+        for u in self.states(n - 1):
+            for v in self.states(n):
+                p_y = p[(n, u, v)] * q[(u, v, "STOP")]
+                if p_y > max:
+                    max = p_y
+                    y[n - 2] = u
+                    y[n - 1] = v
+        
+        for i in xrange(n - 3, -1, -1):
+            y[i] = bp[(i + 3, y[i + 1], y[i + 2])]
+
+        return y
+
+def usage():
+    print """
+    python part2.py counts_file test_file > output_file
+    """
 
 if __name__ == "__main__":
 
     if len(sys.argv) != 3: 
-        usage()
         sys.exit(2)
 
     with open(sys.argv[1], "r") as counts_file:
         (q, e) = get_mle(counts_file)
-        #pprint.pprint(q)
-        #pprint.pprint(e)
 
     hmm = TrigramHMM(q, e)
     with open(sys.argv[2], "r") as test_file:
@@ -88,6 +126,8 @@ if __name__ == "__main__":
             if word:
                 words.append(word)
             else:
-                words.append("STOP")
-                print hmm.find_tags(words)
+                tags = hmm.find_tags(words)
+                for i in xrange(len(tags)):
+                    print words[i], tags[i]
+                print
                 words = []
